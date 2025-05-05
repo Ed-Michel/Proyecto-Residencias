@@ -7,8 +7,8 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 
 # Cargar datos
-coordenadas = pd.read_csv("datasets\\sitios_sinaloa_coordenadas.csv")
-X = pd.read_csv('datasets\\AguaSinaloa_2.csv')
+coordenadas = pd.read_csv("datasets/sitios_sinaloa_coordenadas.csv")
+X = pd.read_csv('datasets/AguaSinaloa_2.csv')
 
 # excluir las dos primeras columnas de identificación
 columnas_numericas = X.columns[2:]  
