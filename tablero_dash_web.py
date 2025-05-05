@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from sklearn.cluster import AffinityPropagation, Birch, DBSCAN, KMeans, MiniBatchKMeans
 from sklearn.decomposition import PCA
@@ -144,4 +145,6 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         return None
     
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Se establece el puerto para correr la app Dash en Render
+    port = int(os.environ.get("PORT", 8050))
+    app.run(debug=False, host="0.0.0.0", port=port)
