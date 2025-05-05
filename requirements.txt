@@ -1,5 +1,5 @@
 pandas
-sklearn
+scikit-learn
 dash
 dash_bootstrap_components
 plotly.express
