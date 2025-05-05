@@ -1,0 +1,7 @@
+pandas
+sklearn.cluster
+sklearn.decomposition
+sklearn.preprocessing
+dash
+dash_bootstrap_components
+plotly.express
