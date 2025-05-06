@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.cluster import AffinityPropagation, Birch, DBSCAN, KMeans, MiniBatchKMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from dash import Dash, dcc, html, Output, Input
+from dash import Dash, dcc, html, Output, Input, State
 import dash_bootstrap_components as dbc
 import plotly.express as px
 
@@ -30,6 +30,7 @@ app = Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[db
 app.layout = dbc.Container([
     html.H1("Clustering - Sitios de muestro Sinaloa"),
     
+    html.Br(),
     dcc.Dropdown(
         id="algoritmo-dropdown",
         options=[
@@ -44,18 +45,51 @@ app.layout = dbc.Container([
         clearable=False
     ),
     
+    html.Br(),
     html.Div([
-        html.Div([html.Label("Damping"), dcc.Input(id="damping", type="number", value=0.7, step=0.1)], id="damping-div"),
-        html.Div([html.Label("Preference"), dcc.Input(id="preference", type="number", value=-8.8, step=0.01)], id="preference-div"),
-        html.Div([html.Label("Threshold"), dcc.Input(id="threshold", type="number", value=0.7, step=0.1)], id="threshold-div"), 
-        html.Div([html.Label("N_clusters"), dcc.Input(id="n_clusters", type="number", value=30, step=1)], id="n_clusters-div"), 
-        html.Div([html.Label("Epsilon"), dcc.Input(id="eps", type="number", value=1.82, step=0.01)], id="eps-div"),
-        html.Div([html.Label("Min_samples"), dcc.Input(id="min_samples", type="number", value=1, step=1)], id="min_samples-div"),
+        html.Div([html.Label("damping"), dcc.Input(id="damping", type="number", value=0.7, step=0.1)], id="damping-div"),
+        html.Div([html.Label("preference"), dcc.Input(id="preference", type="number", value=-8.8, step=0.01)], id="preference-div"),
+        html.Div([html.Label("threshold"), dcc.Input(id="threshold", type="number", value=0.7, step=0.1)], id="threshold-div"), 
+        html.Div([html.Label("n clusters"), dcc.Input(id="n_clusters", type="number", value=30, step=1)], id="n_clusters-div"), 
+        html.Div([html.Label("epsilon"), dcc.Input(id="eps", type="number", value=1.82, step=0.01)], id="eps-div"),
+        html.Div([html.Label("min samples"), dcc.Input(id="min_samples", type="number", value=1, step=1)], id="min_samples-div"),
     ], id="parametros-container"),
     
-    html.Button("Generar Clustering", id="run-button"),
+    html.Br(),
+    html.Button("Reiniciar", id="reset-button", n_clicks=0, style={'margin-right': '10px'}), 
+    html.Button("Generar Clustering", id="run-button", style={'margin-right': '10px'}, disabled=True), 
+    html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
+    dcc.Download(id="descarga-csv"),
+    
+    html.Br(), 
     dcc.Graph(id="mapa-clustering")
 ])
+
+# callback para reiniciar los parámetros al hacer click en el botón reiniciar
+@app.callback(
+    [Output("damping", "value"),
+    Output("preference", "value"),
+    Output("threshold", "value"),
+    Output("n_clusters", "value"),
+    Output("eps", "value"),
+    Output("min_samples", "value"),
+    Output("algoritmo-dropdown", "value")],
+    Input("reset-button", "n_clicks"),
+    prevent_initial_call=True
+)
+
+# método para el reinicio
+def reiniciar_parametros(n_clicks):
+    # valores por defecto
+    return (
+        0.7, # damping
+        -8.8, # preference
+        0.7, # threshold
+        30, # n_clusters
+        1.82, # eps
+        1, # min_samples
+        None # algoritmo
+    )
 
 # callback para mostrar y ocultar los parámetros según el algoritmo seleccionado
 @app.callback(
@@ -88,16 +122,16 @@ def actualizar_parametros(algoritmo):
 @app.callback(
     Output("mapa-clustering", "figure"),
     Input("run-button", "n_clicks"),
-    Input("algoritmo-dropdown", "value"),
-    Input("damping", "value"),
-    Input("preference", "value"),
-    Input("threshold", "value"),
-    Input("n_clusters", "value"),
-    Input("eps", "value"),
-    Input("min_samples", "value")
+    State("algoritmo-dropdown", "value"),
+    State("damping", "value"),
+    State("preference", "value"),
+    State("threshold", "value"),
+    State("n_clusters", "value"),
+    State("eps", "value"),
+    State("min_samples", "value")
 )
 
-# se generan los clusters y sus gráficas
+# método para generar el mapa de clustering
 def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clusters, eps, min_samples):
     try:
         # retorna un mapa vacío si no se ha generado algún clustering
@@ -124,7 +158,7 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         yhat = model.labels_
         # validación para ciertos casos
         coordenadas["Cluster"] = (yhat+1).astype(str)
-    
+        
         fig = px.scatter_mapbox(
             coordenadas, lat="LATITUD", lon="LONGITUD",
             color="Cluster", hover_name="NOMBRE DEL SITIO",
@@ -143,7 +177,33 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         print("Ocurrió un error al generar el clustering:")
         print(str(e))
         return None
-    
+
+# callback para habilitar el botón de descarga
+@app.callback(
+    Output("download-button", "disabled"),
+    Input("run-button", "n_clicks")
+)
+def habilitar_descarga(n_clicks):
+    # habilitar el botón de descarga si se ha generado un clustering
+    return n_clicks is None or n_clicks == 0
+
+# callback para descargar el CSV del clustering generado
+@app.callback(  
+    Output("descarga-csv", "data"),
+    Input("download-button", "n_clicks"),
+    prevent_initial_call=True
+)
+
+# método para descargar el CSV del clustering generado
+def descargar_csv(n_clicks):
+    try:
+        df = coordenadas[["NOMBRE DEL SITIO", "Cluster"]].sort_values("Cluster")
+        return dcc.send_data_frame(df.to_csv, "clusters_asignados_sitios.csv", index=False)
+    except Exception as e:
+        print("Error al generar el archivo a descargar")
+        print(str(e))
+        return None
+
 if __name__ == "__main__":
     # Se establece el puerto para correr la app Dash en Render
     port = int(os.environ.get("PORT", 8050))
