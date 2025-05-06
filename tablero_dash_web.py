@@ -4,6 +4,7 @@ from sklearn.cluster import AffinityPropagation, Birch, DBSCAN, KMeans, MiniBatc
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from dash import Dash, dcc, html, Output, Input, State
+from dash_extensions import EventListener
 import dash_bootstrap_components as dbc
 import plotly.express as px
 
@@ -56,7 +57,15 @@ app.layout = dbc.Container([
     ], id="parametros-container"),
     
     html.Br(),
-    html.Button("Reiniciar", id="reset-button", n_clicks=0, style={'margin-right': '10px'}), 
+    html.Div([
+    EventListener(
+            html.Button("Reiniciar", id="reload-button"),
+            events=[{"event": "click", "props": {"href": "/", "target": "_self"}}]
+        ),
+        dcc.Location(id='url', refresh=True)
+    ]),
+    
+    html.Br(),
     html.Button("Generar Clustering", id="run-button", style={'margin-right': '10px'}, disabled=True), 
     html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
     dcc.Download(id="descarga-csv"),
@@ -65,31 +74,17 @@ app.layout = dbc.Container([
     dcc.Graph(id="mapa-clustering")
 ])
 
-# callback para reiniciar los parámetros al hacer click en el botón reiniciar
+# callback para reiniciar la aplicacion
 @app.callback(
-    [Output("damping", "value"),
-    Output("preference", "value"),
-    Output("threshold", "value"),
-    Output("n_clusters", "value"),
-    Output("eps", "value"),
-    Output("min_samples", "value"),
-    Output("algoritmo-dropdown", "value")],
-    Input("reset-button", "n_clicks"),
-    prevent_initial_call=True
+    Output("url", "href"),
+    [Input("reload-button", "n_clicks")]
 )
 
-# método para el reinicio
-def reiniciar_parametros(n_clicks):
-    # valores por defecto
-    return (
-        0.7, # damping
-        -8.8, # preference
-        0.7, # threshold
-        30, # n_clusters
-        1.82, # eps
-        1, # min_samples
-        None # algoritmo
-    )
+# método para reiniciar la aplicación
+def reiniciar(n_clicks):
+    if n_clicks:
+        return "/"
+    return None
 
 # callback para mostrar y ocultar los parámetros según el algoritmo seleccionado
 @app.callback(
@@ -117,6 +112,15 @@ def actualizar_parametros(algoritmo):
         visible if algoritmo == "DBSCAN" else oculto, # min_samples
     )
 
+# callback para habilitar el boton Generar Clustering al seleccionar un algoritmo
+@app.callback(
+    Output("run-button", "disabled"),
+    Input("algoritmo-dropdown", "value")
+)
+
+# método para habilitar este boton
+def habilitar_boton(algoritmo):
+    return algoritmo is None
 
 # callback para generar el clustering y su respectiva gráfica
 @app.callback(
