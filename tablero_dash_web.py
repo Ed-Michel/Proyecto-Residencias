@@ -77,7 +77,7 @@ app.layout = dbc.Container([
     ]),
     
     dash.html.Br(),
-    dash.html.Button("Generar Clustering", id="run-button", n_clicks=0, style={'margin-right': '10px'}, disabled=True), 
+    dash.html.Button("Generar clusters", id="run-button", n_clicks=0, style={'margin-right': '10px'}, disabled=True), 
     dash.html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
     dash.dcc.Download(id="descarga-csv"),
     
@@ -101,6 +101,11 @@ app.layout = dbc.Container([
         "box-shadow": "0 2px 5px rgba(0,0,0,0.1)"
     }),
     
+    dash.dcc.ConfirmDialog(
+        id='mensaje-error',
+        message="Cantidad de parámetros no valida",
+        displayed=False
+    ),
     dash.html.Br(), 
     dash.dcc.Graph(id="mapa-clustering")
 ])
@@ -152,6 +157,8 @@ def habilitar_boton(algoritmo):
 
 # callback y método para generar el mapa de clustering
 @app.callback(
+    dash.Output("mensaje-error", "message"),
+    dash.Output("mensaje-error", "displayed"),
     dash.Output("clustering-data", "data"),
     dash.Input("run-button", "n_clicks"),
     [
@@ -166,14 +173,21 @@ def habilitar_boton(algoritmo):
     ]
 )
 def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clusters, eps, min_samples, columnas_seleccionadas):
-        if not n_clicks or not metodo or not columnas_seleccionadas:
-            raise dash.exceptions.PreventUpdate
-
+        # evitar ejecucion al iniciar la aplicacion
+        if n_clicks is None or n_clicks == 0:
+            return "", False, dash.no_update
+        # validacion adicional para evitar problemas en la generacion de clusters
+        if not metodo or not columnas_seleccionadas:
+            return "Debe seleccionar un algoritmo y al menos una columna para el clustering.", True, dash.no_update
+        
         # agrupar por "CLAVE SITIO" y calcular el promedio de cada columna numérica seleccionada
-        datos_filtrados = X.groupby("CLAVE SITIO")[columnas_seleccionadas].mean()
+        datos_filtrados = X.groupby("CLAVE SITIO")[columnas_seleccionadas].mean() 
+        # validacion en caso de seleccionar pocas columnas (por lo establecido en el PCA)
+        if datos_filtrados.shape[1] < 7:
+            return "Debe seleccionar al menos 7 columnas (PCA) para el clustering.", True, dash.no_update
+        
         # convertir a matriz de vectores
         datos_filtrados = datos_filtrados.values
-
         # escalar los datos
         datos_filtrados = StandardScaler().fit_transform(datos_filtrados)
         # aplicar PCA para visualizar mejor
@@ -197,7 +211,6 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         model.fit(X_pca)
         # assign a cluster to each example
         yhat = model.labels_
-        
         # validación para ciertos casos
         coordenadas["Cluster"] = (yhat + 1).astype(str)
         
@@ -216,10 +229,13 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         # convierte a string los nombres de cluster
         coordenadas["Cluster"] = coordenadas["Cluster"].astype(str)
 
-        return {
-            "datos": coordenadas.to_dict("records"),
-            "metodo": metodo
-        }
+        # caso exitoso, se actualiza el mapa y se habilita el botón de descarga
+        return (
+            "", False, {
+                "datos": coordenadas.to_dict("records"),
+                "metodo": metodo
+            }
+        )
 
 # callback y método para actualizar el checklist con los clusters detectados
 @app.callback(
