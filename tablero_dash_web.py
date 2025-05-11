@@ -12,17 +12,9 @@ import plotly.express as px
 coordenadas = pd.read_csv("datasets/sitios_sinaloa_coordenadas.csv")
 X = pd.read_csv('datasets/AguaSinaloa_2.csv')
 
-# excluir las dos primeras columnas de identificación
+# excluir las dos primeras columnas de identificación, 
+# se guardan las columnas numericas con las se van a generar los clusters en columnas_numericas
 columnas_numericas = X.columns[2:]  
-# agrupar por "CLAVE SITIO" y calcular el promedio de cada columna numérica
-X = X.groupby("CLAVE SITIO")[columnas_numericas].mean()
-# convertir a matriz de vectores
-X = X.values
-
-# escalar los datos
-X = StandardScaler().fit_transform(X)
-# aplicar PCA para visualizar mejor
-X_pca = PCA(n_components=7).fit_transform(X)
 
 # inicializar la app Dash
 app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -30,6 +22,25 @@ app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheet
 # establecer etiquetas y datos iniciales para los algoritmos
 app.layout = dbc.Container([
     dash.html.H1("Clustering - Sitios de muestro Sinaloa"),
+    
+    dash.html.Br(),
+    dbc.Card([
+        dbc.CardHeader("Selección de parámetros"),
+        dbc.CardBody([
+            dash.dcc.Checklist(
+                id="columnas-agrupacion",
+                options=[{"label": col, "value": col} for col in columnas_numericas],
+                value=columnas_numericas.tolist(),
+                inline=True,
+                inputStyle={"margin-right": "5px", "margin-left": "10px"},
+                labelStyle={"display": "inline-block", "margin-right": "15px"}
+            )
+        ]),
+    ], style={
+        "margin-top": "20px",
+        "background-color": "#f9f9f9",
+        "box-shadow": "0 2px 5px rgba(0,0,0,0.1)"
+    }),
     
     dash.html.Br(),
     dash.dcc.Dropdown(
@@ -73,7 +84,7 @@ app.layout = dbc.Container([
     dash.html.Br(),
     dash.dcc.Store(id="clustering-data"),
     dbc.Card([
-        dbc.CardHeader("Filtrar Clusters"),
+        dbc.CardHeader("Filtrar clusters generados"),
         dbc.CardBody([
             dash.dcc.Checklist(
                 id="cluster-checklist",
@@ -150,13 +161,24 @@ def habilitar_boton(algoritmo):
         dash.State("threshold", "value"),
         dash.State("n_clusters", "value"),
         dash.State("eps", "value"),
-        dash.State("min_samples", "value")
+        dash.State("min_samples", "value"),
+        dash.State("columnas-agrupacion", "value")
     ]
 )
-def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clusters, eps, min_samples):
-        if not n_clicks or not metodo:
+def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clusters, eps, min_samples, columnas_seleccionadas):
+        if not n_clicks or not metodo or not columnas_seleccionadas:
             raise dash.exceptions.PreventUpdate
 
+        # agrupar por "CLAVE SITIO" y calcular el promedio de cada columna numérica seleccionada
+        datos_filtrados = X.groupby("CLAVE SITIO")[columnas_seleccionadas].mean()
+        # convertir a matriz de vectores
+        datos_filtrados = datos_filtrados.values
+
+        # escalar los datos
+        datos_filtrados = StandardScaler().fit_transform(datos_filtrados)
+        # aplicar PCA para visualizar mejor
+        X_pca = PCA(n_components=7).fit_transform(datos_filtrados)
+        
         # selección del algoritmo
         if metodo == "Affinity Propagation":
             model = AffinityPropagation(damping=damping, preference=preference)
