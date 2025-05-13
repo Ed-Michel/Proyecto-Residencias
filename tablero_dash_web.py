@@ -18,7 +18,7 @@ columnas_numericas = X.columns[2:]
 
 # inicializar la app Dash
 app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.BOOTSTRAP])
-
+    
 # establecer etiquetas y datos iniciales para los algoritmos
 app.layout = dbc.Container([
     dash.html.H1("Clustering - Sitios de muestro Sinaloa"),
@@ -81,6 +81,10 @@ app.layout = dbc.Container([
     dash.html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
     dash.dcc.Download(id="descarga-csv"),
     
+    # bloquea la escritura en los inputs
+    dash.html.Div(id="dummy-output", style={"display": "none"}),
+    dash.dcc.Interval(id="init-keydown-block", interval=500, n_intervals=0, max_intervals=1),
+    
     dash.html.Br(),
     dash.dcc.Store(id="clustering-data"),
     dbc.Card([
@@ -109,6 +113,18 @@ app.layout = dbc.Container([
     dash.html.Br(), 
     dash.dcc.Graph(id="mapa-clustering")
 ])
+
+# callback cliente para bloquear la escritura en los inputs
+app.clientside_callback(
+    """
+    function(n) {
+        return window.dash_clientside.clients.bloquearTeclado(n);
+    }
+    """,
+    dash.Output("dummy-output", "children"),
+    dash.Input("init-keydown-block", "n_intervals"),
+    prevent_initial_call=False
+)
 
 # callback y método para el botón de Reiniciar
 @app.callback(
@@ -176,15 +192,13 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         # evitar ejecucion al iniciar la aplicacion
         if n_clicks is None or n_clicks == 0:
             return "", False, dash.no_update
-        # validacion adicional para evitar problemas en la generacion de clusters
-        if not metodo or not columnas_seleccionadas:
-            return "Debe seleccionar un algoritmo y al menos una columna para el clustering.", True, dash.no_update
         
         # agrupar por "CLAVE SITIO" y calcular el promedio de cada columna numérica seleccionada
         datos_filtrados = X.groupby("CLAVE SITIO")[columnas_seleccionadas].mean() 
-        # validacion en caso de seleccionar pocas columnas (por lo establecido en el PCA)
-        if datos_filtrados.shape[1] < 7:
-            return "Debe seleccionar al menos 7 columnas (PCA) para el clustering.", True, dash.no_update
+        
+        # validacion adicional para evitar problemas en la generacion de clusters
+        if not metodo or not columnas_seleccionadas or datos_filtrados.shape[1] < 7:
+            return "Debe seleccionar un algoritmo y al menos 7 columnas (PCA) para el clustering.", True, dash.no_update
         
         # convertir a matriz de vectores
         datos_filtrados = datos_filtrados.values
