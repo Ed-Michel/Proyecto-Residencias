@@ -61,7 +61,7 @@ app.layout = dbc.Container([
     dash.html.Div([
         dash.html.Div([dash.html.Label("damping"), dash.dcc.Input(id="damping", type="number", value=0.7, step=0.1)], id="damping-div"),
         dash.html.Div([dash.html.Label("preference"), dash.dcc.Input(id="preference", type="number", value=-8.8, step=0.01)], id="preference-div"),
-        dash.html.Div([dash.html.Label("threshold"), dash.dcc.Input(id="threshold", type="number", value=0.7, step=0.1)], id="threshold-div"), 
+        dash.html.Div([dash.html.Label("threshold"), dash.dcc.Input(id="threshold", type="number", value=0.7, step=0.01)], id="threshold-div"), 
         dash.html.Div([dash.html.Label("n clusters"), dash.dcc.Input(id="n_clusters", type="number", value=30, step=1)], id="n_clusters-div"), 
         dash.html.Div([dash.html.Label("epsilon"), dash.dcc.Input(id="eps", type="number", value=1.82, step=0.01)], id="eps-div"),
         dash.html.Div([dash.html.Label("min samples"), dash.dcc.Input(id="min_samples", type="number", value=1, step=1)], id="min_samples-div"),
@@ -81,9 +81,9 @@ app.layout = dbc.Container([
     dash.html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
     dash.dcc.Download(id="descarga-csv"),
     
-    # bloquea la escritura en los inputs
+    # valida la escritura en los inputs
     dash.html.Div(id="dummy-output", style={"display": "none"}),
-    dash.dcc.Interval(id="init-keydown-block", interval=500, n_intervals=0, max_intervals=1),
+    dash.dcc.Interval(id="init-keydown-available", interval=500, n_intervals=0, max_intervals=1),
     
     dash.html.Br(),
     dash.dcc.Store(id="clustering-data"),
@@ -103,8 +103,7 @@ app.layout = dbc.Container([
         "margin-top": "20px",
         "background-color": "#f9f9f9",
         "box-shadow": "0 2px 5px rgba(0,0,0,0.1)"
-    }),
-    
+    }),  
     dash.dcc.ConfirmDialog(
         id='mensaje-error',
         message="Cantidad de parámetros no valida",
@@ -114,11 +113,11 @@ app.layout = dbc.Container([
     dash.dcc.Graph(id="mapa-clustering")
 ])
 
-# callback cliente para bloquear la escritura en los inputs
+# callback cliente que valida los símbolos permitidos en los inputs
 app.clientside_callback(
     """
     function(n) {
-        return window.dash_clientside.clients.bloquearTeclado(n);
+        return window.dash_clientside.clients.validarTeclado(n);
     }
     """,
     dash.Output("dummy-output", "children"),
@@ -200,56 +199,74 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         if not metodo or not columnas_seleccionadas or datos_filtrados.shape[1] < 7:
             return "Debe seleccionar un algoritmo y al menos 7 columnas (PCA) para el clustering.", True, dash.no_update
         
-        # convertir a matriz de vectores
-        datos_filtrados = datos_filtrados.values
-        # escalar los datos
-        datos_filtrados = StandardScaler().fit_transform(datos_filtrados)
-        # aplicar PCA para visualizar mejor
-        X_pca = PCA(n_components=7).fit_transform(datos_filtrados)
-        
-        # selección del algoritmo
+        # validaciones adicionales para los parámetros de entrada
         if metodo == "Affinity Propagation":
-            model = AffinityPropagation(damping=damping, preference=preference)
-        elif metodo == "BIRCH":
-            model = Birch(threshold=threshold, n_clusters=n_clusters)
-        elif metodo == "DBSCAN":
-            model = DBSCAN(eps=eps, min_samples=min_samples)
-        elif metodo == "K-Means":
-            model = KMeans(n_clusters=n_clusters)
-        elif metodo == "Mini-Batch K-Means":
-            model = MiniBatchKMeans(n_clusters=n_clusters)
-        else:
-            return px.scatter_mapbox()
-    
-        # fit the model
-        model.fit(X_pca)
-        # assign a cluster to each example
-        yhat = model.labels_
-        # validación para ciertos casos
-        coordenadas["Cluster"] = (yhat + 1).astype(str)
+            if damping is None or not (0.5 <= damping < 1.0):
+                return "Introduzca un valor entre 0.5 y 1.0", True, dash.no_update
         
-        fig = px.scatter_mapbox(
-            coordenadas, lat="LATITUD", lon="LONGITUD",
-            color="Cluster", hover_name="NOMBRE DEL SITIO",
-            category_orders={"Cluster": sorted(coordenadas["Cluster"].unique())},
-            zoom=6.6, height=900, color_discrete_sequence=px.colors.qualitative.Bold
-        )
-    
-        fig.update_traces(marker=dict(size=10))
-        fig.update_layout(showlegend=False, mapbox_style="open-street-map",
-                        mapbox_center={"lat": coordenadas["LATITUD"].mean(), "lon": coordenadas["LONGITUD"].mean()},
-                        title=f"Clustering {metodo}")
-         
-        # convierte a string los nombres de cluster
-        coordenadas["Cluster"] = coordenadas["Cluster"].astype(str)
+        elif metodo == "BIRCH":
+            if threshold is None or threshold <= 0:
+                return "Introduzca un valor mayor a 0.0", True, dash.no_update
+            if n_clusters is None or not (1 <= n_clusters <= 217):
+                return "Introduzca un valor entre 1 y 217", True, dash.no_update
+        
+        elif metodo == "DBSCAN":
+            if eps is None or eps <= 0:
+                return "Introduzca un valor mayor a 0.0", True, dash.no_update
+            if min_samples is None or min_samples < 1:
+                return "Introduzca un valor mayor o igual a 1", True, dash.no_update
+        
+        elif metodo in ["K-Means", "Mini-Batch K-Means"]:
+            if n_clusters is None or not (1 <= n_clusters <= 217):
+                return "Introduzca un valor entre 1 y 217", True, dash.no_update
+        
+        try:
+            datos_filtrados = X.groupby("CLAVE SITIO")[columnas_seleccionadas].mean()
+            datos_filtrados = StandardScaler().fit_transform(datos_filtrados)
+            X_pca = PCA(n_components=7).fit_transform(datos_filtrados)
 
-        # caso exitoso, se actualiza el mapa y se habilita el botón de descarga
-        return (
-            "", False, {
+            if metodo == "Affinity Propagation":
+                model = AffinityPropagation(damping=damping, preference=preference)
+            elif metodo == "BIRCH":
+                model = Birch(threshold=threshold, n_clusters=n_clusters)
+            elif metodo == "DBSCAN":
+                model = DBSCAN(eps=eps, min_samples=min_samples)
+            elif metodo == "K-Means":
+                model = KMeans(n_clusters=n_clusters)
+            elif metodo == "Mini-Batch K-Means":
+                model = MiniBatchKMeans(n_clusters=n_clusters)
+
+            model.fit(X_pca)
+            yhat = model.labels_
+            coordenadas["Cluster"] = (yhat + 1).astype(str)
+
+            fig = px.scatter_mapbox(
+                coordenadas, lat="LATITUD", lon="LONGITUD",
+                color="Cluster", hover_name="NOMBRE DEL SITIO",
+                category_orders={"Cluster": sorted(coordenadas["Cluster"].unique())},
+                zoom=6.6, height=900, color_discrete_sequence=px.colors.qualitative.Bold
+            )
+
+            fig.update_traces(marker=dict(size=10))
+            fig.update_layout(
+                showlegend=False,
+                mapbox_style="open-street-map",
+                mapbox_center={
+                    "lat": coordenadas["LATITUD"].mean(),
+                    "lon": coordenadas["LONGITUD"].mean()
+                },
+                title=f"Clustering {metodo}"
+            )
+
+            coordenadas["Cluster"] = coordenadas["Cluster"].astype(str)
+
+            return "", False, {
                 "datos": coordenadas.to_dict("records"),
                 "metodo": metodo
             }
-        )
+
+        except Exception as e:
+            return f"Ocurrió un error inesperado: {str(e)}", True, dash.no_update
 
 # callback y método para actualizar el checklist con los clusters detectados
 @app.callback(
@@ -263,7 +280,9 @@ def actualizar_checklist(data):
 
     df = pd.DataFrame(data["datos"])
     df["Cluster"] = df["Cluster"].astype(str)
-    opciones = [{"label": c, "value": c} for c in sorted(df["Cluster"].unique())]
+    
+    # ordenar los clusters en el checklist
+    opciones = [{"label": str(c), "value": str(c)} for c in sorted(df["Cluster"].astype(int).unique())]
     seleccionados = [op["value"] for op in opciones]
 
     return opciones, seleccionados
@@ -322,9 +341,11 @@ def descargar_csv(n_clicks, checklist_value):
         else:
             df_filtrado = coordenadas
         
-        # ordenar el DataFrame filtrado por la columna "Cluster"
-        df_filtrado = df_filtrado[["NOMBRE DEL SITIO", "Cluster"]].sort_values("Cluster")
-
+        # se guardan los clusters generados y se ordenan por la columna "Cluster"
+        df_filtrado = df_filtrado[["NOMBRE DEL SITIO", "Cluster"]]
+        df_filtrado["Cluster"] = df_filtrado["Cluster"].astype(int)
+        df_filtrado = df_filtrado.sort_values("Cluster")
+        
         # devolver el archivo CSV filtrado
         return dash.dcc.send_data_frame(df_filtrado.to_csv, "clusters_asignados_sitios.csv", index=False)
     
