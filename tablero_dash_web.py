@@ -16,6 +16,33 @@ X = pd.read_csv('datasets/AguaSinaloa_2.csv')
 # se guardan las columnas numericas con las se van a generar los clusters en columnas_numericas
 columnas_numericas = X.columns[2:]  
 
+# nombre completo de todos los parametros de la base de datos 
+traducciones_parametros_bd = {
+    "COLI_FEC": "Coliformes Fecales",
+    "COT": "Carbono Orgánico Total",
+    "COT_SOL": "Carbono Orgánico Soluble",
+    "N_NH3": "Nitrógeno Amoniacal",
+    "N_NO2": "Nitrógeno de Nitritos",
+    "N_NO3": "Nitrógeno de Nitratos",
+    "N_ORG": "Nitrógeno Orgánico",
+    "N_TOT": "Nitrógeno Total (Cálculo)",
+    "N_TOTK": "Nitrógeno Kjeldahl",
+    "P_TOT": "Fósforo Total",
+    "ORTO_PO4": "Fósforo Reactivo total (o-fosfatos)",
+    "COLOR_VER": "Color Verdadero",
+    "ABS_UV": "Absorción UV",
+    "SDT": "Sólidos Disueltos Totales (Cálculo)",
+    "SST": "Sólidos Suspendidos Totales",
+    "TURBIEDAD": "Turbiedad",
+    "AS_TOT": "Arsénico Total",
+    "CD_TOT": "Cadmio Total",
+    "CR_TOT": "Cromo Total",
+    "HG_TOT": "Mercurio Total",
+    "NI_TOT": "Níquel Total",
+    "PB_TOT": "Plomo Total",
+    "TEMP_AMB": "Temperatura Ambiente"
+}
+
 # inicializar la app Dash
 app = dash.Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=[dbc.themes.BOOTSTRAP])
     
@@ -29,8 +56,14 @@ app.layout = dbc.Container([
         dbc.CardBody([
             dash.dcc.Checklist(
                 id="columnas-agrupacion",
-                options=[{"label": col, "value": col} for col in columnas_numericas],
-                value=columnas_numericas.tolist(),
+                options = [
+                    {
+                        "label": dash.html.Span(col, title=desc),
+                        "value": col
+                    }
+                    for col, desc in traducciones_parametros_bd.items()
+                ],
+                value=list(traducciones_parametros_bd.keys()),
                 inline=True,
                 inputStyle={"margin-right": "5px", "margin-left": "10px"},
                 labelStyle={"display": "inline-block", "margin-right": "15px"}
@@ -59,12 +92,12 @@ app.layout = dbc.Container([
     
     dash.html.Br(),
     dash.html.Div([
-        dash.html.Div([dash.html.Label("damping"), dash.dcc.Input(id="damping", type="number", value=0.7, step=0.1)], id="damping-div"),
-        dash.html.Div([dash.html.Label("preference"), dash.dcc.Input(id="preference", type="number", value=-8.8, step=0.01)], id="preference-div"),
-        dash.html.Div([dash.html.Label("threshold"), dash.dcc.Input(id="threshold", type="number", value=0.7, step=0.01)], id="threshold-div"), 
-        dash.html.Div([dash.html.Label("n clusters"), dash.dcc.Input(id="n_clusters", type="number", value=30, step=1)], id="n_clusters-div"), 
-        dash.html.Div([dash.html.Label("epsilon"), dash.dcc.Input(id="eps", type="number", value=1.82, step=0.01)], id="eps-div"),
-        dash.html.Div([dash.html.Label("min samples"), dash.dcc.Input(id="min_samples", type="number", value=1, step=1)], id="min_samples-div"),
+        dash.html.Div([dash.html.Label(dash.html.Span("damping"), title="Atenuación"),  dash.dcc.Input(id="damping", type="number", value=0.7, step=0.1)], id="damping-div"),
+        dash.html.Div([dash.html.Label(dash.html.Span("preference"), title="Preferencia"), dash.dcc.Input(id="preference", type="number", value=-8.8, step=0.01)], id="preference-div"),
+        dash.html.Div([dash.html.Label(dash.html.Span("threshold"), title="Umbral"), dash.dcc.Input(id="threshold", type="number", value=0.7, step=0.01)], id="threshold-div"), 
+        dash.html.Div([dash.html.Label(dash.html.Span("n clusters"), title="Número de clusters"), dash.dcc.Input(id="n_clusters", type="number", value=30, step=1)], id="n_clusters-div"), 
+        dash.html.Div([dash.html.Label(dash.html.Span("epsilon"), title="Epsilon"), dash.dcc.Input(id="eps", type="number", value=1.82, step=0.01)], id="eps-div"),
+        dash.html.Div([dash.html.Label(dash.html.Span("min samples"), title="Mínimo de muestras"), dash.dcc.Input(id="min_samples", type="number", value=1, step=1)], id="min_samples-div"),
     ], id="parametros-container"),
     
     dash.html.Br(),
@@ -309,7 +342,7 @@ def actualizar_mapa(data, clusters_filtrados):
     fig.update_layout(
         showlegend=False, mapbox_style="open-street-map", 
         mapbox_center={"lat": df_filtrado["LATITUD"].mean(), "lon": df_filtrado["LONGITUD"].mean()},
-        title=f"Mapa de Clustering - {metodo}"
+        title=f"{metodo}"
     )
 
     return fig
