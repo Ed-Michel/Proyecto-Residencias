@@ -81,10 +81,6 @@ app.layout = dbc.Container([
     dash.html.Button("Descargar CSV", id="download-button", n_clicks=0, disabled=True),
     dash.dcc.Download(id="descarga-csv"),
     
-    # valida la escritura en los inputs
-    dash.html.Div(id="dummy-output", style={"display": "none"}),
-    dash.dcc.Interval(id="init-keydown-available", interval=500, n_intervals=0, max_intervals=1),
-    
     dash.html.Br(),
     dash.dcc.Store(id="clustering-data"),
     dbc.Card([
@@ -112,18 +108,6 @@ app.layout = dbc.Container([
     dash.html.Br(), 
     dash.dcc.Graph(id="mapa-clustering")
 ])
-
-# callback cliente que valida los símbolos permitidos en los inputs
-app.clientside_callback(
-    """
-    function(n) {
-        return window.dash_clientside.clients.validarTeclado(n);
-    }
-    """,
-    dash.Output("dummy-output", "children"),
-    dash.Input("init-keydown-block", "n_intervals"),
-    prevent_initial_call=False
-)
 
 # callback y método para el botón de Reiniciar
 @app.callback(
@@ -244,6 +228,15 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
             yhat = model.labels_
             coordenadas["Cluster"] = (yhat + 1).astype(str)
 
+            # validación adicional para el algoritmo BIRCH
+            cantidad_clusters_reales = len(set(yhat)) - (1 if -1 in yhat else 0)
+            if cantidad_clusters_reales < n_clusters:
+                return (
+                    f"Se generaron solo {cantidad_clusters_reales} clusters de los {n_clusters} solicitados. Disminuya el valor de 'threshold'.",
+                    True,
+                    dash.no_update
+                )
+            
             fig = px.scatter_mapbox(
                 coordenadas, lat="LATITUD", lon="LONGITUD",
                 color="Cluster", hover_name="NOMBRE DEL SITIO",
