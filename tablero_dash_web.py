@@ -203,6 +203,10 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
         if metodo == "Affinity Propagation":
             if damping is None or not (0.5 <= damping < 1.0):
                 return "Introduzca un valor entre 0.5 y 1.0", True, dash.no_update
+            try:
+                float(preference)
+            except (ValueError, TypeError):
+                return "Introduzca un valor numérico", True, dash.no_update
         
         elif metodo == "BIRCH":
             if threshold is None or threshold <= 0:
