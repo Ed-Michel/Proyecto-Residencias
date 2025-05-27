@@ -12,7 +12,7 @@ site_names = X[['CLAVE SITIO', 'NOMBRE DEL SITIO']].drop_duplicates().set_index(
 columnas_numericas = X.columns[2:]  
 # agrupar por "CLAVE SITIO" y calcular el promedio de cada columna numérica
 X = X.groupby("CLAVE SITIO")[columnas_numericas].mean()
-# etraer los nombres en el orden establecido por el groupby
+# extraer los nombres en el orden establecido por el groupby
 site_names = site_names.loc[X.index, 'NOMBRE DEL SITIO'].values
 # convertir a matriz de vectores
 X = X.values
