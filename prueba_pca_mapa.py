@@ -109,7 +109,7 @@ def dbscan():
     X_pca = PCA(n_components=7).fit_transform(X)
     
     # define the model
-    model = DBSCAN(eps=2.21, min_samples=1)
+    model = DBSCAN(eps=1.75, min_samples=1)
     # fit the model
     model.fit(X_pca)
     # assign a cluster to each example
