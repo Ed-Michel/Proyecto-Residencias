@@ -262,13 +262,14 @@ def generar_clustering(n_clicks, metodo, damping, preference, threshold, n_clust
             coordenadas["Cluster"] = (yhat + 1).astype(str)
 
             # validación adicional para el algoritmo BIRCH
-            cantidad_clusters_reales = len(set(yhat)) - (1 if -1 in yhat else 0)
-            if cantidad_clusters_reales < n_clusters:
-                return (
-                    f"Se generaron solo {cantidad_clusters_reales} clusters de los {n_clusters} solicitados. Disminuya el valor de 'threshold'.",
-                    True,
-                    dash.no_update
-                )
+            if metodo == "BIRCH":
+                cantidad_clusters_reales = len(set(yhat)) - (1 if -1 in yhat else 0)
+                if cantidad_clusters_reales < n_clusters:
+                    return (
+                        f"Se generaron solo {cantidad_clusters_reales} clusters de los {n_clusters} solicitados. Disminuya el valor de 'threshold'.",
+                        True,
+                        dash.no_update
+                    )
             
             fig = px.scatter_mapbox(
                 coordenadas, lat="LATITUD", lon="LONGITUD",
